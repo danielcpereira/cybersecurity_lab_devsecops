@@ -72,3 +72,22 @@ def test_admin_can_update_grade(client):
     )
     assert response.status_code == 200
     assert api.find_grade(1002, "SRS")["grade"] == 17
+
+
+def test_unauthenticated_malformed_update_is_rejected(client):
+    # Variation: authentication must be checked before parsing the body.
+    response = client.post("/grades/update", json={})
+    assert response.status_code == 401
+
+
+def test_forged_session_role_is_not_trusted(client):
+    # Suggested by the LLM repair: role must come from USERS, not the session.
+    with client.session_transaction() as sess:
+        sess["user"] = "alice"
+        sess["role"] = "admin"
+    response = client.post(
+        "/grades/update",
+        json={"student_id": 1001, "course_id": "SRS", "grade": 20},
+    )
+    assert response.status_code == 403
+    assert api.find_grade(1001, "SRS")["grade"] == 14
