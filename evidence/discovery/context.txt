@@ -1,0 +1,10 @@
+Application context
+This is an academic-services REST API.
+It supports login/logout, inspection of the current session, student profiles,
+grade retrieval and updates, and downloads of teaching materials.
+Users have student, professor, or administrator roles. Student accounts have
+an associated student identifier. Professor accounts have assigned courses.
+Grade records associate a student, a course, and a grade. Teaching materials
+are stored in the application's materials directory.
+The application is used by multiple users. The in-memory records and small
+dataset simplify the teaching environment; they are not a production database.

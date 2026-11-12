@@ -1,0 +1,48 @@
+== F01 authentication missing (no login) ==
+GET /students/1001/profile                                 -> 200  {"email":"alice@uc.pt","name":"Alice","program":"MEI","student_id":1001}
+GET /grades/1001                                           -> 200  [{"course_id":"SRS","grade":14,"student_id":1001},{"course_id":"SSD","grade":16,"student_id":1001}]
+GET /files?path=srs-summary.txt                            -> 200  Secure Requirements Engineering summary
+POST /grades/update (anon)                                 -> 200  {"course_id":"SRS","grade":20,"status":"ok","student_id":1001}
+   stored SRS grade for 1001 now: 20
+== F02 profile object authorization ==
+alice -> /students/1002/profile                            -> 200  {"email":"bob@uc.pt","name":"Bob","program":"MEI","student_id":1002}
+prof_srs -> /students/1001/profile                         -> 200  {"email":"alice@uc.pt","name":"Alice","program":"MEI","student_id":1001}
+== F03 grade read authorization / filtering ==
+alice -> /grades/1002                                      -> 200  [{"course_id":"SRS","grade":15,"student_id":1002}]
+prof_srs -> /grades/1001 (has SRS+SSD)                     -> 200  [{"course_id":"SRS","grade":14,"student_id":1001},{"course_id":"SSD","grade":16,"student_id":1001}]
+== F04 grade update authorization ==
+alice updates own SRS grade to 20                          -> 200  {"course_id":"SRS","grade":20,"status":"ok","student_id":1001}
+alice updates bob SRS grade to 0                           -> 200  {"course_id":"SRS","grade":0,"status":"ok","student_id":1002}
+prof_srs updates alice SSD (not assigned)                  -> 200  {"course_id":"SSD","grade":0,"status":"ok","student_id":1001}
+   stored SSD grade for 1001 now: 0
+== F05 grade update input validation ==
+grade 999                                                  -> 200  {"course_id":"SRS","grade":999,"status":"ok","student_id":1001}
+   GRADES rows 3 -> 3
+grade true (bool)                                          -> 200  {"course_id":"SRS","grade":true,"status":"ok","student_id":1001}
+   GRADES rows 3 -> 3
+grade 'A+' (string)                                        -> 200  {"course_id":"SRS","grade":"A+","status":"ok","student_id":1001}
+   GRADES rows 3 -> 3
+unknown course XYZ                                         -> 200  {"course_id":"XYZ","grade":10,"status":"ok","student_id":1001}
+   GRADES rows 3 -> 4
+unknown student 9999                                       -> 200  {"course_id":"SRS","grade":10,"status":"ok","student_id":9999}
+   GRADES rows 3 -> 4
+student_id as string '1001'                                -> 200  {"course_id":"SRS","grade":10,"status":"ok","student_id":"1001"}
+   GRADES rows 3 -> 4
+missing grade field                                        -> 500  {"error":"'grade'","type":"KeyError"}
+JSON list instead of object                                -> 500  {"error":"list indices must be integers or slices, not str","type":"TypeError"}
+non-JSON body                                              -> 500  {"error":"415 Unsupported Media Type: Did not attempt to load JSON data because the request Content-Type was not 'application/json'.","type":"Unsuppor
+== F06 path traversal ==
+../baseline_secure_coding_api.py                           -> 200  import dataclasses import pathlib import typing  import flask  app = flask.Flask(__name__) app.config["SECRET_KEY"] = "dev-secret-key"  # ------------
+absolute /etc/hosts                                        -> 200  ## # Host Database # # localhost is used to configure the loopback interface # when the system is booting.  Do not change this entry. ## 127.0.0.1	loc
+== F07 student id validation ==
+/students/abc/profile                                      -> 500  {"error":"invalid literal for int() with base 10: 'abc'","type":"ValueError"}
+/grades/-1                                                 -> 200  []
+/grades/0                                                  -> 200  []
+== F08 error handling ==
+missing file (leaks path?)                                 -> 500  {"error":"[Errno 2] No such file or directory: '/Users/danielpereira/Documents/2anoMEI/Laborato\u0301rio/lab04/repository/cybersecurity_lab_devsecops/
+unknown route /nope (should be 404)                        -> 500  {"error":"404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.","ty
+GET on POST-only /grades/update (should be 405)            -> 500  {"error":"invalid literal for int() with base 10: 'update'","type":"ValueError"}
+== F09 session forgery with known secret ==
+/me with forged cookie (no password)                       -> 200  {"courses":[],"role":"admin","student_id":null,"user":"admin1"}
+== F15 session fixation claim (B observation) ==
+session keys after alice login over planted cookie         -> 200  {"courses":[],"role":"student","student_id":1001,"user":"alice"}
